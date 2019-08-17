@@ -1,13 +1,13 @@
 // =================
 // flight settings (you can change these)
 // =================
-const from = 'MDW'; // e.g. 'MDW'
-const to = 'AUS'; // e.g. 'MDW'
-const leaveDate = '2019-10-20'; // format YYYY-MM-DD, e.g. '2019-10-30'
-const returnDate = '2019-10-25'; // format YYYY-MM-DD, e.g. '2019-10-30'
-const passengers = '1'; // e.g. '2'
-const dealPriceThreshold = '300'; // price max, in USD, no symbols, e.g. '50', *optional
-const interval = '1'; // interval to check at, in minutes, e.g. '180', *optional
+const from = ''; // e.g. 'MDW'
+const to = ''; // e.g. 'MDW'
+const leaveDate = ''; // format YYYY-MM-DD, e.g. '2019-10-30'
+const returnDate = ''; // format YYYY-MM-DD, e.g. '2019-10-30'
+const passengers = ''; // e.g. '2'
+const dealPriceThreshold = ''; // price max, in USD, no symbols, e.g. '50'
+const interval = ''; // interval to check at, in minutes, e.g. '180' for every 3-hours
 
 // =================
 // sms settings (add these)
