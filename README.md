@@ -1,50 +1,46 @@
-# SWA Dashboard
-Dashboard to monitor and receive alerts for changes in Southwest fare prices.
+# swa-tracker
+dashboard to monitor and receive alerts for changes in southwest fare prices.
 
 ![image](https://cloud.githubusercontent.com/assets/6979737/17740385/08603f62-645e-11e6-9abf-df4851a95f29.png)
 
-## Why?
-I'm a lazy programmer who was tired of checking flight prices … and I really wanted
-to try out Twilio and [blessed](https://github.com/chjj/blessed/). ¯\\\_(ツ)\_/¯
+## requirements
 
-## Installation
-Since I would rather not get in trouble for publishing this tool to npm, you can
-clone the repo locally and use `npm link` to use the executable.
-```
-cd wherever-you-cloned-it-to
+install [nodejs](https://nodejs.org/en/) (version 10+, i'm using 10.15)
+
+## installation
+
+open a terminal and:
+
+```bash
+git clone https://github.com/sheminusminus/swa-tracker.git
+cd swa-tracker
+npm install
 npm link
+open .
 ```
 
-## Usage
-It will scrape Southwest's prices every `n` minutes (`n` = whatever interval you
-define via the `--interval` flag) and compare the results, letting you know the
-difference in price since the last interval. The default interval is 30 mins.
+this should open the swa-tracker folder in finder.
 
-You may optionally set a `--deal-price-threshold` flag, which will alert you if
-the prices fall below the threshold you define. Other than `--interval`, all
-other flags are required. _Currently, there is no validation._
+from here, open the `settings.js` file. this is where you can change flight settings, and add settings for twilio sms.
+
+## usage
+
+after completing the installation steps, you can start swa-tracker by opening a terminal and running:
 
 ```bash
-swa \
-  --from 'DAL' \
-  --to 'LGA' \
-  --leave-date '11/01/2016' \
-  --return-date '11/08/2016' \
-  --passengers 2 \
-  --deal-price-threshold 50 \ # In dollars (optional)
-  --interval 5 # In minutes (optional)
+swa
 ```
 
-### Twilio integration
-If you have a Twilio account (I'm using a free trial account) and you've set up
-a deal price threshold, you can set the following environment vars to set up SMS
-deal alerts. _Just be warned: as long as the deal threshold is met, you're going
-to receive SMS messages at the rate of the interval you defined. Better wake up
-and book those tickets!_
+### info - twilio integration
 
-```bash
-export TWILIO_ACCOUNT_SID=""
-export TWILIO_AUTH_TOKEN=""
-export TWILIO_PHONE_FROM=""
-export TWILIO_PHONE_TO=""
-```
+if you have a twilio account (a free trial account will get you by for quite some time)
+and you've set up a deal price threshold, you can set edit the twilio values in `settings.js` to set up sms
+deal alerts.
+
+_just be warned: as long as the deal threshold is met, you're going
+to receive sms messages at the rate of the interval you defined._
+
+to set up twilio, create an account, create a new project (type: products > programmable sms),
+create a new phone number, and finally, verify your regular cell number.
+
+they'll start you off with like $15 or $20. sending an sms message costs something like 2 cents.
