@@ -14,8 +14,6 @@ const moment = require('moment');
 const qs = require('query-string');
 const { prompt } = require('enquirer');
 
-const settings = require('./settings');
-
 // Time constants
 const TIME_MS = 1;
 const TIME_SEC = TIME_MS * 1000;
@@ -475,7 +473,7 @@ async function fetch() {
 
   const search = qs.stringify({
     adultPassengersCount,
-    departureDate: settings.leaveDate,
+    departureDate,
     departureTimeOfDay: deptTime,
     destinationAirportCode,
     fareType: 'USD',
@@ -483,7 +481,7 @@ async function fetch() {
     originationAirportCode,
     passengerType: 'ADULT',
     reset: true,
-    returnDate: settings.returnDate,
+    returnDate,
     returnTimeOfDay: retTime,
     seniorPassengersCount: 0,
     tripType: 'roundtrip',
