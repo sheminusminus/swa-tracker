@@ -11,6 +11,7 @@ const pretty = require('pretty-ms');
 const airports = require('airports');
 const puppeteer = require('puppeteer');
 const moment = require('moment');
+const qs = require('query-string');
 
 const settings = require('./settings');
 
@@ -39,6 +40,8 @@ let adultPassengersCount = settings.passengers;
 let dealPriceThreshold = parseInt(settings.dealPriceThreshold, 10);
 let dealPriceThresholdRoundTrip = parseInt(settings.dealPriceThresholdRoundtrip, 10);
 let interval = settings.interval ? parseFloat(settings.interval) : 30; // In minutes
+let deptTime = settings.departureTimeOfDay || 'ALL_DAY';
+let retTime = settings.returnTimeOfDay || 'ALL_DAY';
 
 const tSid = settings.twilioAccountSid;
 const tAuth = settings.twilioAuthToken;
@@ -337,21 +340,41 @@ async function fetch() {
 
   const page = await browser.newPage();
   await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.100 Safari/537.36');
+  // adultPassengersCount=1&departureDate=2019-08-22&departureTimeOfDay=NOON_TO_SIX&destinationAirportCode=MDW&fareType=USD&int=HOMEQBOMAIR
+  // &originationAirportCode=BOS&passengerType=ADULT&reset=true&returnDate=2019-08-25&returnTimeOfDay=AFTER_SIX&seniorPassengersCount=0&tripType=roundtrip
 
-  await page.goto(saUrl, {waitUntil: 'networkidle2'});
-  await page.type('#LandingAirBookingSearchForm_originationAirportCode', originationAirportCode);
-  await page.type('#LandingAirBookingSearchForm_destinationAirportCode', destinationAirportCode);
-  await page.type('#LandingAirBookingSearchForm_departureDate', departureDate);
-  await page.type('#LandingAirBookingSearchForm_returnDate', returnDate);
-  await page.type('#LandingAirBookingSearchForm_adultPassengersCount', adultPassengersCount);
+  const search = qs.stringify({
+    adultPassengersCount,
+    departureDate: settings.leaveDate,
+    departureTimeOfDay: deptTime,
+    destinationAirportCode,
+    fareType: 'USD',
+    int: 'HOMEQBOMAIR',
+    originationAirportCode,
+    passengerType: 'ADULT',
+    reset: true,
+    returnDate: settings.returnDate,
+    returnTimeOfDay: retTime,
+    seniorPassengersCount: 0,
+    tripType: 'roundtrip',
+  });
+  const queryUrl = `https://www.southwest.com/air/booking/select.html?${search}`;
+  console.log(queryUrl);
+  await page.goto(queryUrl, {waitUntil: 'networkidle2'});
+  // await page.type('#LandingAirBookingSearchForm_originationAirportCode', originationAirportCode);
+  // await page.type('#LandingAirBookingSearchForm_destinationAirportCode', destinationAirportCode);
+  // await page.type('#LandingAirBookingSearchForm_departureDate', departureDate);
+  // await page.type('#LandingAirBookingSearchForm_returnDate', returnDate);
+  // await page.type('#LandingAirBookingSearchForm_adultPassengersCount', adultPassengersCount);
 
-  const promoCodeInput = await page.$('#LandingAirBookingSearchForm_promoCode');
-  promoCodeInput.press('Enter');
+  // const promoCodeInput = await page.$('#LandingAirBookingSearchForm_promoCode');
+  // promoCodeInput.press('Enter');
 
   const fairValueSelector = '.fare-button--value-total';
 
-  await page.waitForNavigation({waitUntil: 'networkidle2'});
+  // await page.waitForNavigation({waitUntil: 'networkidle2'});
   await page.waitForSelector(fairValueSelector);
+  await page.screenshot({ path: 'eg.png', fullPage: true });
 
   const deptListHandle = await page.$('.search-results--container .container_standard:nth-child(2) .air-booking-select-price-matrix .transition-content ul');
   const deptResults = await deptListHandle.$$eval('li .fare-button--value-total', nodes => nodes.map(n => n.innerText));
@@ -463,7 +486,7 @@ async function fetch() {
     });
   }
 
-  dashboard.render();
+  // dashboard.render();
 
   fares.outbound = [];
   fares.return = [];
@@ -476,11 +499,11 @@ async function fetch() {
 airports.forEach((airport) => {
   switch (airport.iata) {
     case originationAirportCode:
-      dashboard.waypoint({ lat: airport.lat, lon: airport.lon, color: 'red', char: 'X' });
+      // dashboard.waypoint({ lat: airport.lat, lon: airport.lon, color: 'red', char: 'X' });
       break;
 
     case destinationAirportCode:
-      dashboard.waypoint({ lat: airport.lat, lon: airport.lon, color: 'yellow', char: 'X' });
+      // dashboard.waypoint({ lat: airport.lat, lon: airport.lon, color: 'yellow', char: 'X' });
       break;
 
     default:
@@ -496,7 +519,8 @@ dashboard.settings([
   `Return date: ${returnDate}`,
   `Passengers: ${adultPassengersCount}`,
   `Interval: ${pretty(interval * TIME_MIN)}`,
-  `Deal price: ${dealPriceThreshold ? `<= \$${dealPriceThreshold}` : 'disabled'}`,
+  `Deal price (one-way): ${dealPriceThreshold ? `<= \$${dealPriceThreshold}` : 'disabled'}`,
+  `Deal price (roundtrip): ${dealPriceThresholdRoundTrip ? `<= \$${dealPriceThresholdRoundTrip}` : 'disabled'}`,
   `SMS alerts: ${isTwilioConfigured ? tTo : 'disabled'}`
 ]);
 
