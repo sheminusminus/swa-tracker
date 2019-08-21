@@ -22,10 +22,12 @@ const TIME_MIN = TIME_SEC * 60;
 // Fares
 let prevLowestOutboundFare;
 let prevLowestReturnFare;
+let prevLowestRoundtrip;
 
 const fares = {
   outbound: [],
-  return: []
+  return: [],
+  roundtrip: [],
 };
 
 // Configurable trip options
@@ -35,12 +37,13 @@ let departureDate = moment(settings.leaveDate).format('MM/DD');
 let returnDate = moment(settings.returnDate).format('MM/DD');
 let adultPassengersCount = settings.passengers;
 let dealPriceThreshold = parseInt(settings.dealPriceThreshold, 10);
+let dealPriceThresholdRoundTrip = parseInt(settings.dealPriceThresholdRoundtrip, 10);
 let interval = settings.interval ? parseFloat(settings.interval) : 30; // In minutes
 
-const tSid = process.env.T_SID || settings.twilioAccountSid;
-const tAuth = process.env.T_AUTH || settings.twilioAuthToken;
-const tTo = process.env.T_TO || settings.twilioPhoneTo;
-const tFrom = process.env.T_FROM || settings.twilioPhoneFrom;
+const tSid = settings.twilioAccountSid;
+const tAuth = settings.twilioAuthToken;
+const tTo = settings.twilioPhoneTo;
+const tFrom = settings.twilioPhoneFrom;
 
 let twilioClient;
 
@@ -94,6 +97,14 @@ class Dashboard {
         y: [],
         style: {
           line: 'yellow'
+        }
+      },
+      roundtrip: {
+        title: 'Roundtrip',
+        x: [],
+        y: [],
+        style: {
+          line: 'magenta'
         }
       }
     };
@@ -222,9 +233,15 @@ class Dashboard {
       y: [...this.graphs.return.y, prices.return]
     });
 
+    Object.assign(this.graphs.roundtrip, {
+      x: [...this.graphs.roundtrip.x, now],
+      y: [...this.graphs.roundtrip.y, prices.roundtrip]
+    });
+
     this.widgets.graph.setData([
       this.graphs.outbound,
-      this.graphs.return
+      this.graphs.return,
+      this.graphs.roundtrip,
     ])
   }
 
@@ -356,12 +373,15 @@ async function fetch() {
 
   const lowestOutboundFare = Math.min(...fares.outbound);
   const lowestReturnFare = Math.min(...fares.return);
+  const lowestRoundtrip = lowestOutboundFare + lowestReturnFare;
 
   const outboundFareDiff = (prevLowestOutboundFare || lowestOutboundFare) - lowestOutboundFare;
   const returnFareDiff = (prevLowestReturnFare || lowestReturnFare) - lowestReturnFare;
+  const roundtripFareDiff = (prevLowestRoundtrip || lowestRoundtrip) - lowestRoundtrip;
 
   let outboundFareDiffString = '';
   let returnFareDiffString = '';
+  let roundtripFareDiffString = '';
 
   // Create a string to show the difference
   if (!isNaN(outboundFareDiff) && !isNaN(returnFareDiff)) {
@@ -386,12 +406,21 @@ async function fetch() {
     } else if (returnFareDiff === 0) {
       returnFareDiffString = chalk.blue(`(no change)`)
     }
+
+    if (roundtripFareDiff > 0) {
+      roundtripFareDiffString = chalk.green(`(down \$${Math.abs(roundtripFareDiff)})`)
+    } else if (returnFareDiff < 0) {
+      roundtripFareDiffString = chalk.red(`(up \$${Math.abs(roundtripFareDiff)})`)
+    } else if (returnFareDiff === 0) {
+      roundtripFareDiffString = chalk.blue(`(no change)`)
+    }
   }
 
   if (faresAreValid) {
     // Store current fares for next time
     prevLowestOutboundFare = lowestOutboundFare;
     prevLowestReturnFare = lowestReturnFare;
+    prevLowestRoundtrip = lowestRoundtrip;
 
     // Do some Twilio magic (SMS alerts for awesome deals)
     if (dealPriceThreshold && (lowestOutboundFare <= dealPriceThreshold || lowestReturnFare <= dealPriceThreshold)) {
@@ -403,18 +432,34 @@ async function fetch() {
       ]);
 
       if (isTwilioConfigured) {
-        sendTextMessage(message);
+        // sendTextMessage(message);
+      }
+    }
+
+    // Do some Twilio magic (SMS alerts for awesome deals)
+    if (dealPriceThresholdRoundTrip && lowestOutboundFare + lowestReturnFare <= dealPriceThresholdRoundTrip) {
+      const message = `Roundtrip deal alert! Lowest fair has hit \$${lowestOutboundFare + lowestReturnFare}`;
+
+      // Party time
+      dashboard.log([
+        rainbow(message)
+      ]);
+
+      if (isTwilioConfigured) {
+        // sendTextMessage(message);
       }
     }
 
     dashboard.log([
       `Lowest fair for an outbound flight is currently \$${[lowestOutboundFare, outboundFareDiffString].filter(i => i).join(" ")}`,
-      `Lowest fair for a return flight is currently \$${[lowestReturnFare, returnFareDiffString].filter(i => i).join(" ")}`
+      `Lowest fair for a return flight is currently \$${[lowestReturnFare, returnFareDiffString].filter(i => i).join(" ")}`,
+      `Lowest fair for roundtrip is currently \$${[lowestRoundtrip, roundtripFareDiffString].filter(i => i).join(" ")}`,
     ]);
 
     dashboard.plot({
       outbound: lowestOutboundFare,
-      return: lowestReturnFare
+      return: lowestReturnFare,
+      roundtrip: lowestRoundtrip,
     });
   }
 
@@ -422,6 +467,7 @@ async function fetch() {
 
   fares.outbound = [];
   fares.return = [];
+  fares.roundtrip = [];
 
   setTimeout(fetch, interval * TIME_MIN);
 }
@@ -451,7 +497,7 @@ dashboard.settings([
   `Passengers: ${adultPassengersCount}`,
   `Interval: ${pretty(interval * TIME_MIN)}`,
   `Deal price: ${dealPriceThreshold ? `<= \$${dealPriceThreshold}` : 'disabled'}`,
-  `SMS alerts: ${isTwilioConfigured ? process.env.T_TO : 'disabled'}`
+  `SMS alerts: ${isTwilioConfigured ? tTo : 'disabled'}`
 ]);
 
 process.nextTick(async () => {
