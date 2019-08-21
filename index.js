@@ -12,6 +12,7 @@ const airports = require('airports');
 const puppeteer = require('puppeteer');
 const moment = require('moment');
 const qs = require('query-string');
+const { prompt } = require('enquirer');
 
 const settings = require('./settings');
 
@@ -31,30 +32,40 @@ const fares = {
   roundtrip: [],
 };
 
-// Configurable trip options
-let originationAirportCode = settings.from;
-let destinationAirportCode = settings.to;
-let departureDate = moment(settings.leaveDate).format('MM/DD');
-let returnDate = moment(settings.returnDate).format('MM/DD');
-let adultPassengersCount = settings.passengers;
-let dealPriceThreshold = parseInt(settings.dealPriceThreshold, 10);
-let dealPriceThresholdRoundTrip = parseInt(settings.dealPriceThresholdRoundtrip, 10);
-let interval = settings.interval ? parseFloat(settings.interval) : 30; // In minutes
-let deptTime = settings.departureTimeOfDay || 'ALL_DAY';
-let retTime = settings.returnTimeOfDay || 'ALL_DAY';
+const timeMsgs = {
+  ALL_DAY: 'All day',
+  BEFORE_NOON: 'Before noon',
+  NOON_TO_SIX: 'Noon to 6pm',
+  AFTER_SIX: 'After 6pm',
+};
 
-const tSid = settings.twilioAccountSid;
-const tAuth = settings.twilioAuthToken;
-const tTo = settings.twilioPhoneTo;
-const tFrom = settings.twilioPhoneFrom;
+// Configurable trip options
+let originationAirportCode;
+let destinationAirportCode;
+let departureDate;
+let returnDate;
+let adultPassengersCount;
+let dealPriceThreshold;
+let dealPriceThresholdRoundTrip;
+let interval;
+let deptTime;
+let retTime;
+
+let tSid;
+let tAuth;
+let tTo;
+let tFrom;
 
 let twilioClient;
+let isTwilioConfigured;
 
-// Check if Twilio values are set
-const isTwilioConfigured = tSid && tAuth && tFrom && tTo;
+function doTwilio() {
+  // Check if Twilio values are set
+  isTwilioConfigured = tSid && tAuth && tFrom && tTo;
 
-if (isTwilioConfigured) {
-  twilioClient = new twilio(tSid, tAuth);
+  if (isTwilioConfigured) {
+    twilioClient = new twilio(tSid, tAuth);
+  }
 }
 
 /**
@@ -302,7 +313,7 @@ class Dashboard {
   }
 }
 
-const dashboard = new Dashboard();
+let dashboard;
 
 /**
  * Send a text message using Twilio
@@ -328,6 +339,127 @@ const sendTextMessage = async (message) => {
   }
 };
 
+async function getPrompts() {
+  const questions = [{
+    type: 'input',
+    name: 'originCode',
+    message: 'Starting airport code?'
+  }, {
+    type: 'input',
+    name: 'destCode',
+    message: 'Destination airport code?'
+  }, {
+    type: 'input',
+    name: 'deptDate',
+    message: 'Departure date? (format: YYYY-MM-DD)',
+  }, {
+    type: 'input',
+    name: 'retDate',
+    message: 'Return date? (format: YYYY-MM-DD)',
+  }, {
+    type: 'input',
+    name: 'passCount',
+    message: 'Number of passengers?',
+    initial: '1',
+  }, {
+    type: 'input',
+    name: 'price',
+    message: 'Deal price threshold? (one-way)',
+  }, {
+    type: 'input',
+    name: 'priceRound',
+    message: 'Deal price threshold? (roundtrip)',
+  }, {
+    type: 'select',
+    name: 'outTime',
+    message: 'Departure time of day?',
+    initial: 0,
+    choices: [
+      { name: 'ALL_DAY',   message: 'Any',   value: 'ALL_DAY' }, //<= choice object
+      { name: 'BEFORE_NOON', message: 'Before noon', value: 'BEFORE_NOON' }, //<= choice object
+      { name: 'NOON_TO_SIX',  message: 'Noon to 6pm',  value: 'NOON_TO_SIX' },  //<= choice object
+      { name: 'AFTER_SIX',  message: 'After 6pm',  value: 'AFTER_SIX' }  //<= choice object
+    ],
+  }, {
+    type: 'select',
+    name: 'inTime',
+    message: 'Return time of day?',
+    initial: 0,
+    choices: [
+      { name: 'ALL_DAY',   message: 'Any',   value: 'ALL_DAY' }, //<= choice object
+      { name: 'BEFORE_NOON', message: 'Before noon', value: 'BEFORE_NOON' }, //<= choice object
+      { name: 'NOON_TO_SIX',  message: 'Noon to 6pm',  value: 'NOON_TO_SIX' },  //<= choice object
+      { name: 'AFTER_SIX',  message: 'After 6pm',  value: 'AFTER_SIX' }  //<= choice object
+    ],
+  }, {
+    type: 'input',
+    name: 'checkInt',
+    message: 'Price check interval? (in minutes)',
+    initial: '180',
+  }, {
+    type: 'confirm',
+    name: 'setupSms',
+    message: 'Setup SMS alerts?',
+  }];
+
+  const {
+    originCode,
+    destCode,
+    deptDate,
+    retDate,
+    passCount,
+    price,
+    priceRound,
+    outTime,
+    inTime,
+    checkInt,
+    setupSms,
+  } = await prompt(questions);
+
+  adultPassengersCount = parseInt(passCount, 10);
+  departureDate = deptDate;
+  returnDate = retDate;
+  dealPriceThreshold = price ? parseFloat(price) : undefined;
+  dealPriceThresholdRoundTrip = priceRound ? parseFloat(priceRound) : undefined;
+  deptTime = outTime;
+  retTime = inTime;
+  originationAirportCode = originCode;
+  destinationAirportCode = destCode;
+  interval = parseInt(checkInt, 10);
+
+  if (setupSms) {
+    const questions2 = [{
+      type: 'input',
+      name: 'sid',
+      message: 'Twilio SID?',
+    }, {
+      type: 'input',
+      name: 'auth',
+      message: 'Twilio auth token?',
+    }, {
+      type: 'input',
+      name: 'fromNum',
+      message: 'From phone number? (Twilio number)',
+    }, {
+      type: 'input',
+      name: 'toNum',
+      message: 'To phone number? (Your number)',
+    }];
+
+    const {
+      sid,
+      auth,
+      fromNum,
+      toNum,
+    } = await prompt(questions2);
+
+    tSid = sid;
+    tFrom = fromNum;
+    tAuth = auth;
+    tTo = toNum;
+  }
+}
+
 /**
  * Fetch latest Southwest prices
  *
@@ -340,8 +472,6 @@ async function fetch() {
 
   const page = await browser.newPage();
   await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.100 Safari/537.36');
-  // adultPassengersCount=1&departureDate=2019-08-22&departureTimeOfDay=NOON_TO_SIX&destinationAirportCode=MDW&fareType=USD&int=HOMEQBOMAIR
-  // &originationAirportCode=BOS&passengerType=ADULT&reset=true&returnDate=2019-08-25&returnTimeOfDay=AFTER_SIX&seniorPassengersCount=0&tripType=roundtrip
 
   const search = qs.stringify({
     adultPassengersCount,
@@ -359,20 +489,11 @@ async function fetch() {
     tripType: 'roundtrip',
   });
   const queryUrl = `https://www.southwest.com/air/booking/select.html?${search}`;
-  console.log(queryUrl);
-  await page.goto(queryUrl, {waitUntil: 'networkidle2'});
-  // await page.type('#LandingAirBookingSearchForm_originationAirportCode', originationAirportCode);
-  // await page.type('#LandingAirBookingSearchForm_destinationAirportCode', destinationAirportCode);
-  // await page.type('#LandingAirBookingSearchForm_departureDate', departureDate);
-  // await page.type('#LandingAirBookingSearchForm_returnDate', returnDate);
-  // await page.type('#LandingAirBookingSearchForm_adultPassengersCount', adultPassengersCount);
 
-  // const promoCodeInput = await page.$('#LandingAirBookingSearchForm_promoCode');
-  // promoCodeInput.press('Enter');
+  await page.goto(queryUrl, {waitUntil: 'networkidle2'});
 
   const fairValueSelector = '.fare-button--value-total';
 
-  // await page.waitForNavigation({waitUntil: 'networkidle2'});
   await page.waitForSelector(fairValueSelector);
   await page.screenshot({ path: 'eg.png', fullPage: true });
 
@@ -486,7 +607,7 @@ async function fetch() {
     });
   }
 
-  // dashboard.render();
+  dashboard.render();
 
   fares.outbound = [];
   fares.return = [];
@@ -495,35 +616,38 @@ async function fetch() {
   setTimeout(fetch, interval * TIME_MIN);
 }
 
-// Get lat/lon for airports (no validation on non-existent airports)
-airports.forEach((airport) => {
-  switch (airport.iata) {
-    case originationAirportCode:
-      // dashboard.waypoint({ lat: airport.lat, lon: airport.lon, color: 'red', char: 'X' });
-      break;
-
-    case destinationAirportCode:
-      // dashboard.waypoint({ lat: airport.lat, lon: airport.lon, color: 'yellow', char: 'X' });
-      break;
-
-    default:
-      break;
-  }
-});
-
-// Print settings
-dashboard.settings([
-  `Origin airport: ${originationAirportCode}`,
-  `Destination airport: ${destinationAirportCode}`,
-  `Outbound date: ${departureDate}`,
-  `Return date: ${returnDate}`,
-  `Passengers: ${adultPassengersCount}`,
-  `Interval: ${pretty(interval * TIME_MIN)}`,
-  `Deal price (one-way): ${dealPriceThreshold ? `<= \$${dealPriceThreshold}` : 'disabled'}`,
-  `Deal price (roundtrip): ${dealPriceThresholdRoundTrip ? `<= \$${dealPriceThresholdRoundTrip}` : 'disabled'}`,
-  `SMS alerts: ${isTwilioConfigured ? tTo : 'disabled'}`
-]);
-
 process.nextTick(async () => {
+  await getPrompts();
+  doTwilio();
+  dashboard = new Dashboard();
+  // Print settings
+  dashboard.settings([
+    `Origin airport: ${originationAirportCode}`,
+    `Destination airport: ${destinationAirportCode}`,
+    `Outbound date: ${departureDate}`,
+    `Dept Time: ${timeMsgs[deptTime]}`,
+    `Return date: ${returnDate}`,
+    `Return Time: ${timeMsgs[retTime]}`,
+    `Passengers: ${adultPassengersCount}`,
+    `Interval: ${pretty(interval * TIME_MIN)}`,
+    `Deal price (one-way): ${dealPriceThreshold ? `<= \$${dealPriceThreshold}` : 'disabled'}`,
+    `Deal price (roundtrip): ${dealPriceThresholdRoundTrip ? `<= \$${dealPriceThresholdRoundTrip}` : 'disabled'}`,
+    `SMS alerts: ${isTwilioConfigured ? tTo : 'disabled'}`
+  ]);
+  // Get lat/lon for airports (no validation on non-existent airports)
+  airports.forEach((airport) => {
+    switch (airport.iata) {
+      case originationAirportCode:
+        dashboard.waypoint({ lat: airport.lat, lon: airport.lon, color: 'red', char: 'X' });
+        break;
+
+      case destinationAirportCode:
+        dashboard.waypoint({ lat: airport.lat, lon: airport.lon, color: 'yellow', char: 'X' });
+        break;
+
+      default:
+        break;
+    }
+  });
   await fetch();
 });
