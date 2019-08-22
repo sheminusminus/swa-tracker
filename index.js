@@ -457,7 +457,7 @@ async function getPrompts() {
       tTo = toNum;
     }
   } catch (e) {
-    console.log(e);
+    // console.log('Goodbye!');
   }
 }
 
@@ -613,44 +613,48 @@ async function fetch() {
     fares.return = [];
     fares.roundtrip = [];
   } catch (e) {
-    console.log(e);
+    // console.log('Goodbye!');
   }
 
   setTimeout(fetch, interval * TIME_MIN);
 }
 
 process.nextTick(async () => {
-  await getPrompts();
-  doTwilio();
-  dashboard = new Dashboard();
-  // Print settings
-  dashboard.settings([
-    `Origin airport: ${originationAirportCode}`,
-    `Destination airport: ${destinationAirportCode}`,
-    `Outbound date: ${departureDate}`,
-    `Dept Time: ${timeMsgs[deptTime]}`,
-    `Return date: ${returnDate}`,
-    `Return Time: ${timeMsgs[retTime]}`,
-    `Passengers: ${adultPassengersCount}`,
-    `Interval: ${pretty(interval * TIME_MIN)}`,
-    `Deal price (one-way): ${dealPriceThreshold ? `<= \$${dealPriceThreshold}` : 'disabled'}`,
-    `Deal price (roundtrip): ${dealPriceThresholdRoundTrip ? `<= \$${dealPriceThresholdRoundTrip}` : 'disabled'}`,
-    `SMS alerts: ${isTwilioConfigured ? tTo : 'disabled'}`
-  ]);
-  // Get lat/lon for airports (no validation on non-existent airports)
-  airports.forEach((airport) => {
-    switch (airport.iata) {
-      case originationAirportCode:
-        dashboard.waypoint({ lat: airport.lat, lon: airport.lon, color: 'red', char: 'X' });
-        break;
+  try {
+    await getPrompts();
+    doTwilio();
+    dashboard = new Dashboard();
+    // Print settings
+    dashboard.settings([
+      `Origin airport: ${originationAirportCode}`,
+      `Destination airport: ${destinationAirportCode}`,
+      `Outbound date: ${departureDate}`,
+      `Dept Time: ${timeMsgs[deptTime]}`,
+      `Return date: ${returnDate}`,
+      `Return Time: ${timeMsgs[retTime]}`,
+      `Passengers: ${adultPassengersCount}`,
+      `Interval: ${pretty(interval * TIME_MIN)}`,
+      `Deal price (one-way): ${dealPriceThreshold ? `<= \$${dealPriceThreshold}` : 'disabled'}`,
+      `Deal price (roundtrip): ${dealPriceThresholdRoundTrip ? `<= \$${dealPriceThresholdRoundTrip}` : 'disabled'}`,
+      `SMS alerts: ${isTwilioConfigured ? tTo : 'disabled'}`
+    ]);
+    // Get lat/lon for airports (no validation on non-existent airports)
+    airports.forEach((airport) => {
+      switch (airport.iata) {
+        case originationAirportCode:
+          dashboard.waypoint({ lat: airport.lat, lon: airport.lon, color: 'red', char: 'X' });
+          break;
 
-      case destinationAirportCode:
-        dashboard.waypoint({ lat: airport.lat, lon: airport.lon, color: 'yellow', char: 'X' });
-        break;
+        case destinationAirportCode:
+          dashboard.waypoint({ lat: airport.lat, lon: airport.lon, color: 'yellow', char: 'X' });
+          break;
 
-      default:
-        break;
-    }
-  });
-  await fetch();
+        default:
+          break;
+      }
+    });
+    await fetch();
+  } catch (e) {
+    console.log('Goodbye!');
+  }
 });
