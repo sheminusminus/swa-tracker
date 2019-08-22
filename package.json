@@ -1,14 +1,14 @@
 {
   "name": "swa-tracker",
-  "version": "1.0.0",
-  "description": "Dashboard to monitor and receive alerts for changes in Southwest fare prices",
+  "version": "1.2",
+  "description": "Monitor changes in Southwest airfare",
   "main": "index.js",
   "bin": {
     "swa": "index.js"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/ezekg/swa-dashboard"
+    "url": "https://github.com/sheminusminus/swa-tracker"
   },
   "author": "Emily Kolar <emkolar@gmail.com>",
   "license": "",
